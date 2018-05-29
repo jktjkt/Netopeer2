@@ -37,7 +37,7 @@ module: ietf-netconf-server
 
 ### SSH
 
-Testing SSH listen configuration is set during server installation because in this basic form is not a security risk (the usernames and passwords are read from the local system). With this configuration (`../stock_config.xml`) the server should listen on all IPv4 interfaces (0.0.0.0) on the port 830.
+A default SSH listen configuration is set during server installation because in this basic form is not a security risk (the usernames and passwords are read from the local system). With this configuration (`../stock_config.xml`) the server should listen on all interfaces (IPv4 and IPv6, `::`) on the port 830.
 
 Also, the server must use a private key to authenticate to the client. A default OpenSSH RSA host key is imported during installation if available. Otherwise a host key must be loaded or generated manually (section [Private Keys](#private-keys)).
 
