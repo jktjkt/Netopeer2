@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -45,7 +46,8 @@
 #undef main
 
 struct lyd_node *data = NULL;
-volatile int initialized;
+int initialized;
+sem_t wait_for_init;
 int pipes[2][2], p_in, p_out;
 
 /*
@@ -431,6 +433,10 @@ __wrap_nc_accept(int timeout, struct nc_session **session)
         (*session)->opts.server.session_start = (*session)->opts.server.last_rpc = time(NULL);
         printf("test: New session 1\n");
         initialized = 1;
+        if (sem_post(&wait_for_init)) {
+            perror("sem_post");
+            exit(1);
+        }
         ret = NC_MSG_HELLO;
     } else {
         usleep(timeout * 1000);
@@ -489,8 +495,9 @@ np_start(void **state)
     initialized = 0;
     assert_int_equal(pthread_create(&server_tid, NULL, server_thread, NULL), 0);
 
-    while (!initialized) {
-        usleep(100000);
+    if (sem_wait(&wait_for_init)) {
+        perror("sem_wait");
+        exit(1);
     }
 
     return 0;
@@ -772,6 +779,10 @@ test_startstop(void **state)
 int
 main(void)
 {
+    if (sem_init(&wait_for_init, 0, 0)) {
+        perror("sem_init");
+        return 1;
+    }
     const struct CMUnitTest tests[] = {
                     cmocka_unit_test_setup(test_startstop, np_start),
                     cmocka_unit_test(test_validate_config),
@@ -786,5 +797,10 @@ main(void)
     if (setenv("CMOCKA_TEST_ABORT", "1", 1)) {
         fprintf(stderr, "Cannot set Cmocka thread environment variable.\n");
     }
-    return cmocka_run_group_tests(tests, NULL, NULL);
+    int res = cmocka_run_group_tests(tests, NULL, NULL);
+    if (sem_destroy(&wait_for_init)) {
+        perror("sem_destroy");
+        return 1;
+    }
+    return res;
 }
